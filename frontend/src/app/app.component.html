@@ -1,0 +1,195 @@
+<div class="app-layout">
+  <!-- Top Navigation Header -->
+  <header class="navbar">
+    <div class="nav-container">
+      <div class="brand">
+        <div class="brand-logo">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"></circle>
+            <circle cx="12" cy="12" r="4"></circle>
+            <line x1="12" y1="2" x2="12" y2="4"></line>
+            <line x1="12" y1="20" x2="12" y2="22"></line>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <span class="brand-title">Takwene</span>
+          <span class="brand-subtitle">Track Management & DSP Distribution</span>
+        </div>
+      </div>
+
+      <!-- Auth and Actions -->
+      <div class="nav-actions">
+        <!-- Auth Status / Demo Login -->
+        <div *ngIf="api.isAuthenticated(); else unauthenticated" class="auth-badge">
+          <span class="auth-dot"></span>
+          <span class="auth-user">{{ api.currentUser() }}</span>
+          <button class="btn-text" (click)="logout()">Logout</button>
+        </div>
+        <ng-template #unauthenticated>
+          <button class="btn btn-demo-auth" (click)="loginDemo()" [disabled]="isLoggingIn">
+            <span class="key-icon">🔑</span>
+            {{ isLoggingIn ? 'Logging in...' : '1-Click Demo Login' }}
+          </button>
+        </ng-template>
+
+        <button class="btn btn-outline" (click)="showArtistModal = true">
+          + New Artist
+        </button>
+
+        <button class="btn btn-primary" (click)="showTrackModal = true">
+          + Add Track
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="main-content">
+    <!-- Feedback banner -->
+    <div *ngIf="toastMessage" class="toast-banner">
+      {{ toastMessage }}
+    </div>
+
+    <!-- Overview Stats Banner -->
+    <div class="stats-row">
+      <div class="stat-card" (click)="setStatusFilter('all')" [class.stat-active]="selectedStatus === 'all'">
+        <span class="stat-label">Total Tracks</span>
+        <span class="stat-val">{{ tracks.length }}</span>
+      </div>
+      <div class="stat-card" (click)="setStatusFilter('draft')" [class.stat-active]="selectedStatus === 'draft'">
+        <span class="stat-label">Draft</span>
+        <span class="stat-val text-draft">{{ countByStatus('draft') }}</span>
+      </div>
+      <div class="stat-card" (click)="setStatusFilter('submitted')" [class.stat-active]="selectedStatus === 'submitted'">
+        <span class="stat-label">Submitted</span>
+        <span class="stat-val text-submitted">{{ countByStatus('submitted') }}</span>
+      </div>
+      <div class="stat-card" (click)="setStatusFilter('distributed')" [class.stat-active]="selectedStatus === 'distributed'">
+        <span class="stat-label">Distributed</span>
+        <span class="stat-val text-distributed">{{ countByStatus('distributed') }}</span>
+      </div>
+    </div>
+
+    <!-- Filter & Search Controls -->
+    <div class="toolbar">
+      <!-- Status Tabs -->
+      <div class="status-tabs">
+        <button
+          class="tab-btn"
+          [class.tab-active]="selectedStatus === 'all'"
+          (click)="setStatusFilter('all')"
+        >
+          All ({{ tracks.length }})
+        </button>
+        <button
+          class="tab-btn"
+          [class.tab-active]="selectedStatus === 'draft'"
+          (click)="setStatusFilter('draft')"
+        >
+          Draft ({{ countByStatus('draft') }})
+        </button>
+        <button
+          class="tab-btn"
+          [class.tab-active]="selectedStatus === 'submitted'"
+          (click)="setStatusFilter('submitted')"
+        >
+          Submitted ({{ countByStatus('submitted') }})
+        </button>
+        <button
+          class="tab-btn"
+          [class.tab-active]="selectedStatus === 'distributed'"
+          (click)="setStatusFilter('distributed')"
+        >
+          Distributed ({{ countByStatus('distributed') }})
+        </button>
+      </div>
+
+      <!-- Search Input -->
+      <div class="search-box">
+        <input
+          type="text"
+          placeholder="Search by track title, artist, or ISRC..."
+          [(ngModel)]="searchQuery"
+          class="search-input"
+        />
+      </div>
+    </div>
+
+    <!-- Tracks Table / List View -->
+    <div class="table-container">
+      <div *ngIf="isLoading" class="loading-state">
+        <div class="spinner"></div>
+        <p>Loading tracks from Takwene API...</p>
+      </div>
+
+      <div *ngIf="!isLoading && filteredTracks.length === 0" class="empty-state">
+        <p>No tracks found matching your criteria.</p>
+      </div>
+
+      <table *ngIf="!isLoading && filteredTracks.length > 0" class="tracks-table">
+        <thead>
+          <tr>
+            <th>Track Title</th>
+            <th>Artist</th>
+            <th>ISRC</th>
+            <th>Genre</th>
+            <th>Release Date</th>
+            <th>Status</th>
+            <th>Distributions</th>
+            <th class="text-right">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let track of filteredTracks" (click)="openTrackDetail(track)" class="clickable-row">
+            <td class="font-bold text-light">{{ track.title }}</td>
+            <td>{{ track.artistName }}</td>
+            <td class="font-mono text-muted">{{ track.isrc }}</td>
+            <td><span class="genre-tag">{{ track.genre }}</span></td>
+            <td>{{ track.releaseDate | date:'mediumDate' }}</td>
+            <td>
+              <app-status-badge [status]="track.status"></app-status-badge>
+            </td>
+            <td>
+              <div class="dist-icons">
+                <span *ngFor="let dist of track.distributions" class="dist-pill" [title]="dist.dspName + ': ' + dist.status">
+                  {{ dist.dspName }}
+                  <span class="mini-status" [class]="'mini-' + dist.status">●</span>
+                </span>
+                <span *ngIf="!track.distributions || track.distributions.length === 0" class="text-muted text-small">
+                  None
+                </span>
+              </div>
+            </td>
+            <td class="text-right">
+              <button class="btn-table-action" (click)="openTrackDetail(track); $event.stopPropagation()">
+                Manage →
+              </button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </main>
+
+  <!-- Modals -->
+  <app-track-detail
+    *ngIf="selectedTrack"
+    [track]="selectedTrack"
+    [availableDsps]="dsps"
+    (closeEvent)="selectedTrack = null"
+    (trackUpdated)="onTrackUpdated($event)"
+  ></app-track-detail>
+
+  <app-create-track-modal
+    *ngIf="showTrackModal"
+    [artists]="artists"
+    (closeEvent)="showTrackModal = false"
+    (trackCreated)="onTrackCreated($event)"
+  ></app-create-track-modal>
+
+  <app-create-artist-modal
+    *ngIf="showArtistModal"
+    (closeEvent)="showArtistModal = false"
+    (artistCreated)="onArtistCreated($event)"
+  ></app-create-artist-modal>
+</div>
