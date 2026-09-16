@@ -94,4 +94,35 @@ public class TracksController : ControllerBase
         var result = await _trackService.UpdateTrackStatusAsync(id, request, ct);
         return Ok(result);
     }
+
+    /// <summary>
+    /// Update or simulate DSP distribution status (e.g. live or rejected with reason) (JWT protected).
+    /// </summary>
+    [Authorize]
+    [HttpPatch("{id:guid}/distributions/{dspId:guid}/status")]
+    [ProducesResponseType(typeof(TrackDetailDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<TrackDetailDto>> UpdateDistributionStatus(
+        Guid id,
+        Guid dspId,
+        [FromBody] UpdateDistributionStatusRequest request,
+        CancellationToken ct)
+    {
+        var result = await _trackService.UpdateDistributionStatusAsync(id, dspId, request, ct);
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Export the catalog and distribution status matrix as a CSV file.
+    /// </summary>
+    [HttpGet("export")]
+    [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
+    public async Task<IActionResult> ExportCatalog(CancellationToken ct)
+    {
+        var csvBytes = await _trackService.ExportCatalogCsvAsync(ct);
+        var fileName = $"takwene-catalog-{DateTime.UtcNow:yyyyMMdd-HHmmss}.csv";
+        return File(csvBytes, "text/csv", fileName);
+    }
 }

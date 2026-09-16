@@ -60,7 +60,7 @@ import { StatusBadgeComponent } from '../status-badge/status-badge.component';
         </div>
 
         <div class="dsp-grid">
-          <div *ngFor="let dsp of availableDsps" class="dsp-card" [class.dsp-active]="getDistribution(dsp.id)">
+          <div *ngFor="let dsp of availableDsps" class="dsp-card" [class.dsp-active]="getDistribution(dsp.id)" [class.dsp-rejected]="getDistribution(dsp.id)?.status === 'rejected'">
             <div class="dsp-header">
               <div class="dsp-info">
                 <span class="dsp-name">{{ dsp.name }}</span>
@@ -73,6 +73,60 @@ import { StatusBadgeComponent } from '../status-badge/status-badge.component';
                 <div class="dist-timestamp">
                   <span class="time-label">Submitted:</span>
                   <span>{{ dist.submittedAt | date:'short' }}</span>
+                </div>
+                <div *ngIf="dist.reviewedAt" class="dist-timestamp" style="margin-top: 4px;">
+                  <span class="time-label">Reviewed:</span>
+                  <span>{{ dist.reviewedAt | date:'short' }}</span>
+                </div>
+                <div *ngIf="dist.status === 'rejected' && dist.rejectionReason" class="rejection-box">
+                  <span class="rejection-label">Rejection Reason:</span>
+                  <span class="rejection-text">{{ dist.rejectionReason }}</span>
+                </div>
+
+                <!-- Interactive DSP Review Simulator -->
+                <div class="dsp-actions-bar">
+                  <div *ngIf="rejectingDspId !== dsp.id; else rejectForm">
+                    <div class="dsp-sim-btns">
+                      <button
+                        class="btn-sim btn-sim-live"
+                        *ngIf="dist.status !== 'live'"
+                        [disabled]="isUpdatingDsp"
+                        (click)="onSimulateDspStatus(dsp.id, 'live')"
+                        title="Simulate DSP approving and going live"
+                      >
+                        ✓ Set Live
+                      </button>
+                      <button
+                        class="btn-sim btn-sim-reject"
+                        *ngIf="dist.status !== 'rejected'"
+                        [disabled]="isUpdatingDsp"
+                        (click)="startReject(dsp.id)"
+                        title="Simulate DSP rejecting this track"
+                      >
+                        ✕ Reject
+                      </button>
+                    </div>
+                  </div>
+                  <ng-template #rejectForm>
+                    <div class="dsp-reject-input-box">
+                      <input
+                        type="text"
+                        class="dsp-reject-input"
+                        [(ngModel)]="rejectionReasonInput"
+                        placeholder="Rejection reason..."
+                      />
+                      <div class="dsp-reject-actions">
+                        <button
+                          class="btn-mini btn-danger"
+                          [disabled]="!rejectionReasonInput.trim() || isUpdatingDsp"
+                          (click)="confirmReject(dsp.id)"
+                        >
+                          Confirm
+                        </button>
+                        <button class="btn-mini btn-secondary" (click)="cancelReject()">Cancel</button>
+                      </div>
+                    </div>
+                  </ng-template>
                 </div>
               </div>
               <ng-template #notDispatched>
@@ -262,6 +316,102 @@ import { StatusBadgeComponent } from '../status-badge/status-badge.component';
       border-color: #3b82f6;
       background: #19253c;
     }
+    .dsp-card.dsp-rejected {
+      border-color: rgba(239, 68, 68, 0.6);
+      background: #23161c;
+    }
+    .rejection-box {
+      margin-top: 6px;
+      padding: 6px 8px;
+      background: rgba(239, 68, 68, 0.12);
+      border-left: 3px solid #ef4444;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      color: #fca5a5;
+    }
+    .rejection-label {
+      font-weight: 700;
+      display: block;
+      font-size: 0.68rem;
+      text-transform: uppercase;
+      color: #f87171;
+    }
+    .rejection-text {
+      word-break: break-word;
+    }
+    .dsp-actions-bar {
+      margin-top: 8px;
+      padding-top: 6px;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .dsp-sim-btns {
+      display: flex;
+      gap: 6px;
+    }
+    .btn-sim {
+      flex: 1;
+      padding: 4px 8px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      border-radius: 6px;
+      border: 1px solid;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-sim-live {
+      background: rgba(16, 185, 129, 0.12);
+      color: #34d399;
+      border-color: rgba(16, 185, 129, 0.3);
+    }
+    .btn-sim-live:hover:not(:disabled) {
+      background: rgba(16, 185, 129, 0.25);
+      color: #6ee7b7;
+    }
+    .btn-sim-reject {
+      background: rgba(239, 68, 68, 0.12);
+      color: #f87171;
+      border-color: rgba(239, 68, 68, 0.3);
+    }
+    .btn-sim-reject:hover:not(:disabled) {
+      background: rgba(239, 68, 68, 0.25);
+      color: #fca5a5;
+    }
+    .dsp-reject-input-box {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      margin-top: 4px;
+    }
+    .dsp-reject-input {
+      background: #0f172a;
+      border: 1px solid #374151;
+      color: #f3f4f6;
+      font-size: 0.75rem;
+      border-radius: 4px;
+      padding: 4px 6px;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    .dsp-reject-actions {
+      display: flex;
+      gap: 4px;
+      justify-content: flex-end;
+    }
+    .btn-mini {
+      padding: 2px 8px;
+      font-size: 0.7rem;
+      border-radius: 4px;
+      border: none;
+      cursor: pointer;
+    }
+    .btn-mini.btn-danger {
+      background: #dc2626;
+      color: white;
+    }
+    .btn-mini.btn-secondary {
+      background: #374151;
+      color: #d1d5db;
+    }
     .dsp-header {
       display: flex;
       justify-content: space-between;
@@ -417,6 +567,9 @@ export class TrackDetailComponent implements OnInit {
   newStatus: 'draft' | 'submitted' | 'distributed' = 'draft';
   isDistributing = false;
   isUpdatingStatus = false;
+  isUpdatingDsp = false;
+  rejectingDspId: string | null = null;
+  rejectionReasonInput = '';
   errorMessage = '';
   successMessage = '';
 
@@ -491,5 +644,44 @@ export class TrackDetailComponent implements OnInit {
 
   close(): void {
     this.closeEvent.emit();
+  }
+
+  startReject(dspId: string): void {
+    this.rejectingDspId = dspId;
+    this.rejectionReasonInput = 'Metadata does not match audio recording standards.';
+  }
+
+  cancelReject(): void {
+    this.rejectingDspId = null;
+    this.rejectionReasonInput = '';
+  }
+
+  confirmReject(dspId: string): void {
+    if (!this.rejectionReasonInput.trim()) return;
+    this.onSimulateDspStatus(dspId, 'rejected', this.rejectionReasonInput.trim());
+    this.rejectingDspId = null;
+  }
+
+  onSimulateDspStatus(dspId: string, status: 'live' | 'rejected', reason?: string): void {
+    this.isUpdatingDsp = true;
+    this.errorMessage = '';
+    this.successMessage = '';
+
+    this.api.updateDistributionStatus(this.track.id, dspId, {
+      status,
+      rejectionReason: reason
+    }).subscribe({
+      next: (updated) => {
+        this.track = updated;
+        this.newStatus = updated.status;
+        this.isUpdatingDsp = false;
+        this.successMessage = `DSP status successfully updated to ${status}.`;
+        this.trackUpdated.emit(updated);
+      },
+      error: (err) => {
+        this.isUpdatingDsp = false;
+        this.errorMessage = err.error?.detail || err.error?.title || 'Failed to update DSP distribution status.';
+      }
+    });
   }
 }

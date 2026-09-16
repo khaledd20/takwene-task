@@ -39,6 +39,11 @@
         <button class="btn btn-primary" (click)="showTrackModal = true">
           + Add Track
         </button>
+
+        <button class="btn btn-export" (click)="exportCsv()" [disabled]="isExporting">
+          <span>📥</span>
+          {{ isExporting ? 'Exporting...' : 'Export CSV' }}
+        </button>
       </div>
     </div>
   </header>

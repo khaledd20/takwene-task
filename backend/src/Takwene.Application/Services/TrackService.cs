@@ -15,17 +15,20 @@ public class TrackService : ITrackService
     private readonly IValidator<CreateTrackRequest> _createValidator;
     private readonly IValidator<UpdateTrackStatusRequest> _updateStatusValidator;
     private readonly IValidator<DistributeTrackRequest> _distributeValidator;
+    private readonly IValidator<UpdateDistributionStatusRequest> _updateDistributionStatusValidator;
 
     public TrackService(
         IApplicationDbContext context,
         IValidator<CreateTrackRequest> createValidator,
         IValidator<UpdateTrackStatusRequest> updateStatusValidator,
-        IValidator<DistributeTrackRequest> distributeValidator)
+        IValidator<DistributeTrackRequest> distributeValidator,
+        IValidator<UpdateDistributionStatusRequest> updateDistributionStatusValidator)
     {
         _context = context;
         _createValidator = createValidator;
         _updateStatusValidator = updateStatusValidator;
         _distributeValidator = distributeValidator;
+        _updateDistributionStatusValidator = updateDistributionStatusValidator;
     }
 
     public async Task<TrackDto> CreateTrackAsync(CreateTrackRequest request, CancellationToken ct = default)
@@ -158,7 +161,9 @@ public class TrackService : ITrackService
                 DspId = d.DspId,
                 DspName = d.Dsp?.Name ?? "Unknown DSP",
                 SubmittedAt = d.SubmittedAt,
-                Status = d.Status.ToString().ToLowerInvariant()
+                Status = d.Status.ToString().ToLowerInvariant(),
+                RejectionReason = d.RejectionReason,
+                ReviewedAt = d.ReviewedAt
             }).OrderBy(d => d.DspName).ToList()
         };
     }
@@ -278,5 +283,93 @@ public class TrackService : ITrackService
             Genre = track.Genre,
             Status = track.Status.ToString().ToLowerInvariant()
         };
+    }
+
+    public async Task<TrackDetailDto> UpdateDistributionStatusAsync(Guid trackId, Guid dspId, UpdateDistributionStatusRequest request, CancellationToken ct = default)
+    {
+        var validationResult = await _updateDistributionStatusValidator.ValidateAsync(request, ct);
+        if (!validationResult.IsValid)
+        {
+            var errors = string.Join("; ", validationResult.Errors.Select(e => e.ErrorMessage));
+            throw new DomainException(errors);
+        }
+
+        var track = await _context.Tracks
+            .Include(t => t.Distributions)
+            .FirstOrDefaultAsync(t => t.Id == trackId, ct);
+
+        if (track == null)
+        {
+            throw new NotFoundException("Track", trackId);
+        }
+
+        var distribution = track.Distributions.FirstOrDefault(d => d.DspId == dspId);
+        if (distribution == null)
+        {
+            throw new NotFoundException($"Distribution for DSP '{dspId}' on track '{trackId}' not found.");
+        }
+
+        var isLive = request.Status.Trim().Equals("live", StringComparison.OrdinalIgnoreCase);
+        if (isLive)
+        {
+            distribution.Status = DistributionStatus.Live;
+            distribution.RejectionReason = null;
+            distribution.ReviewedAt = DateTime.UtcNow;
+
+            // If all distributions are live, auto-transition track status to Distributed
+            if (track.Distributions.Count > 0 && track.Distributions.All(d => d.Status == DistributionStatus.Live))
+            {
+                track.Status = TrackStatus.Distributed;
+            }
+        }
+        else
+        {
+            distribution.Status = DistributionStatus.Rejected;
+            distribution.RejectionReason = request.RejectionReason?.Trim();
+            distribution.ReviewedAt = DateTime.UtcNow;
+        }
+
+        await _context.SaveChangesAsync(ct);
+
+        return await GetTrackByIdAsync(trackId, ct);
+    }
+
+    public async Task<byte[]> ExportCatalogCsvAsync(CancellationToken ct = default)
+    {
+        var tracks = await _context.Tracks
+            .Include(t => t.Artist)
+            .Include(t => t.Distributions)
+                .ThenInclude(d => d.Dsp)
+            .AsNoTracking()
+            .OrderBy(t => t.Title)
+            .ToListAsync(ct);
+
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine("ID,Title,Artist,ISRC,Genre,ReleaseDate,Status,TotalDsps,LiveDsps,PendingDsps,RejectedDsps");
+
+        foreach (var t in tracks)
+        {
+            var title = EscapeCsv(t.Title);
+            var artistName = EscapeCsv(t.Artist?.Name ?? "Unknown");
+            var isrc = EscapeCsv(t.Isrc);
+            var genre = EscapeCsv(t.Genre);
+            var releaseDate = t.ReleaseDate.ToString("yyyy-MM-dd");
+            var status = t.Status.ToString().ToLowerInvariant();
+
+            var totalDsps = t.Distributions.Count;
+            var liveDsps = t.Distributions.Count(d => d.Status == DistributionStatus.Live);
+            var pendingDsps = t.Distributions.Count(d => d.Status == DistributionStatus.Pending);
+            var rejectedDsps = t.Distributions.Count(d => d.Status == DistributionStatus.Rejected);
+
+            sb.AppendLine($"{t.Id},\"{title}\",\"{artistName}\",\"{isrc}\",\"{genre}\",{releaseDate},{status},{totalDsps},{liveDsps},{pendingDsps},{rejectedDsps}");
+        }
+
+        return System.Text.Encoding.UTF8.GetBytes(sb.ToString());
+    }
+
+    private static string EscapeCsv(string field)
+    {
+        if (string.IsNullOrEmpty(field)) return string.Empty;
+        return field.Replace("\"", "\"\"");
     }
 }

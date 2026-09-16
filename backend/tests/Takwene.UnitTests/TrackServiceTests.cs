@@ -39,8 +39,9 @@ public class TrackServiceTests : IDisposable
         var createVal = new CreateTrackRequestValidator();
         var updateVal = new UpdateTrackStatusRequestValidator();
         var distVal = new DistributeTrackRequestValidator();
+        var updateDistVal = new UpdateDistributionStatusRequestValidator();
 
-        _sut = new TrackService(_context, createVal, updateVal, distVal);
+        _sut = new TrackService(_context, createVal, updateVal, distVal, updateDistVal);
     }
 
     public void Dispose()
@@ -209,5 +210,131 @@ public class TrackServiceTests : IDisposable
         // Assert
         drafts.Should().ContainSingle(t => t.Title == "Draft Song");
         submitted.Should().ContainSingle(t => t.Title == "Submitted Song");
+    }
+
+    [Fact]
+    public async Task UpdateDistributionStatusAsync_WhenApprovedToLive_UpdatesDistributionAndSetsTrackToDistributedWhenAllLive()
+    {
+        // Arrange
+        var track = await _sut.CreateTrackAsync(new CreateTrackRequest
+        {
+            Title = "Karma",
+            ArtistId = _testArtist.Id,
+            Isrc = "USUG12200111",
+            ReleaseDate = DateTime.UtcNow,
+            Genre = "Pop"
+        });
+
+        await _sut.DistributeTrackAsync(track.Id, new DistributeTrackRequest
+        {
+            DspIds = new List<Guid> { _testDsp1.Id }
+        });
+
+        var request = new UpdateDistributionStatusRequest
+        {
+            Status = "live"
+        };
+
+        // Act
+        var result = await _sut.UpdateDistributionStatusAsync(track.Id, _testDsp1.Id, request);
+
+        // Assert
+        result.Should().NotBeNull();
+        result.Status.Should().Be("distributed");
+        var dist = result.Distributions.Should().ContainSingle(d => d.DspId == _testDsp1.Id).Subject;
+        dist.Status.Should().Be("live");
+        dist.RejectionReason.Should().BeNull();
+        dist.ReviewedAt.Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task UpdateDistributionStatusAsync_WhenRejectedWithReason_SetsRejectedStatusAndRejectionReason()
+    {
+        // Arrange
+        var track = await _sut.CreateTrackAsync(new CreateTrackRequest
+        {
+            Title = "Mastermind",
+            ArtistId = _testArtist.Id,
+            Isrc = "USUG12200222",
+            ReleaseDate = DateTime.UtcNow,
+            Genre = "Pop"
+        });
+
+        await _sut.DistributeTrackAsync(track.Id, new DistributeTrackRequest
+        {
+            DspIds = new List<Guid> { _testDsp1.Id }
+        });
+
+        var request = new UpdateDistributionStatusRequest
+        {
+            Status = "rejected",
+            RejectionReason = "Audio bitrate does not meet DSP requirements (minimum 320kbps)."
+        };
+
+        // Act
+        var result = await _sut.UpdateDistributionStatusAsync(track.Id, _testDsp1.Id, request);
+
+        // Assert
+        result.Should().NotBeNull();
+        var dist = result.Distributions.Should().ContainSingle(d => d.DspId == _testDsp1.Id).Subject;
+        dist.Status.Should().Be("rejected");
+        dist.RejectionReason.Should().Be("Audio bitrate does not meet DSP requirements (minimum 320kbps).");
+        dist.ReviewedAt.Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task UpdateDistributionStatusAsync_WhenRejectedWithoutReason_ThrowsDomainException()
+    {
+        // Arrange
+        var track = await _sut.CreateTrackAsync(new CreateTrackRequest
+        {
+            Title = "Bejeweled",
+            ArtistId = _testArtist.Id,
+            Isrc = "USUG12200333",
+            ReleaseDate = DateTime.UtcNow,
+            Genre = "Pop"
+        });
+
+        await _sut.DistributeTrackAsync(track.Id, new DistributeTrackRequest
+        {
+            DspIds = new List<Guid> { _testDsp1.Id }
+        });
+
+        var request = new UpdateDistributionStatusRequest
+        {
+            Status = "rejected",
+            RejectionReason = "" // Empty rejection reason should fail validation
+        };
+
+        // Act & Assert
+        var act = async () => await _sut.UpdateDistributionStatusAsync(track.Id, _testDsp1.Id, request);
+        await act.Should().ThrowAsync<DomainException>()
+            .WithMessage("*Rejection reason is required*");
+    }
+
+    [Fact]
+    public async Task ExportCatalogCsvAsync_ReturnsValidCsvWithHeadersAndContent()
+    {
+        // Arrange
+        var track = await _sut.CreateTrackAsync(new CreateTrackRequest
+        {
+            Title = "Lavender Haze",
+            ArtistId = _testArtist.Id,
+            Isrc = "USUG12200444",
+            ReleaseDate = new DateTime(2022, 10, 21),
+            Genre = "Pop",
+            Status = "draft"
+        });
+
+        // Act
+        var csvBytes = await _sut.ExportCatalogCsvAsync();
+        var csvContent = System.Text.Encoding.UTF8.GetString(csvBytes);
+
+        // Assert
+        csvContent.Should().NotBeNullOrEmpty();
+        csvContent.Should().StartWith("ID,Title,Artist,ISRC,Genre,ReleaseDate,Status,TotalDsps,LiveDsps,PendingDsps,RejectedDsps");
+        csvContent.Should().Contain("Lavender Haze");
+        csvContent.Should().Contain("Taylor Swift");
+        csvContent.Should().Contain("USUG12200444");
     }
 }

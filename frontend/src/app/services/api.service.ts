@@ -9,6 +9,7 @@ import {
   CreateArtistRequest,
   DistributeTrackRequest,
   UpdateTrackStatusRequest,
+  UpdateDistributionStatusRequest,
   LoginResponse
 } from '../models/takwene.model';
 
@@ -123,6 +124,18 @@ export class ApiService {
   updateTrackStatus(id: string, request: UpdateTrackStatusRequest): Observable<Track> {
     return this.http.patch<Track>(`${this.baseUrl}/tracks/${id}/status`, request, {
       headers: this.getAuthHeaders()
+    });
+  }
+
+  updateDistributionStatus(id: string, dspId: string, request: UpdateDistributionStatusRequest): Observable<Track> {
+    return this.http.patch<Track>(`${this.baseUrl}/tracks/${id}/distributions/${dspId}/status`, request, {
+      headers: this.getAuthHeaders()
+    });
+  }
+
+  exportCatalogCsv(): Observable<Blob> {
+    return this.http.get(`${this.baseUrl}/tracks/export`, {
+      responseType: 'blob'
     });
   }
 }

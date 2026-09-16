@@ -14,4 +14,6 @@ public class TrackDistributionDto
     public string DspName { get; set; } = string.Empty;
     public DateTime SubmittedAt { get; set; }
     public string Status { get; set; } = string.Empty;
+    public string? RejectionReason { get; set; }
+    public DateTime? ReviewedAt { get; set; }
 }

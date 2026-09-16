@@ -36,6 +36,7 @@ export class AppComponent implements OnInit {
 
   isLoading = true;
   isLoggingIn = false;
+  isExporting = false;
   toastMessage = '';
 
   constructor(public api: ApiService) {}
@@ -142,6 +143,29 @@ export class AppComponent implements OnInit {
   logout(): void {
     this.api.logout();
     this.showToast('Logged out successfully.');
+  }
+
+  exportCsv(): void {
+    this.isExporting = true;
+    this.api.exportCatalogCsv().subscribe({
+      next: (blob) => {
+        this.isExporting = false;
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `takwene-catalog-${new Date().toISOString().slice(0, 10)}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+        this.showToast('Catalog CSV exported successfully.');
+      },
+      error: (err) => {
+        this.isExporting = false;
+        console.error('Export error:', err);
+        this.showToast('Failed to export catalog CSV.');
+      }
+    });
   }
 
   private showToast(msg: string): void {

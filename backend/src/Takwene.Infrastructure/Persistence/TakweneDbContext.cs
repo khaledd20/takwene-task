@@ -81,6 +81,8 @@ public class TakweneDbContext : DbContext, IApplicationDbContext
                 .IsRequired();
 
             entity.Property(td => td.SubmittedAt).IsRequired();
+            entity.Property(td => td.RejectionReason).HasMaxLength(500);
+            entity.Property(td => td.ReviewedAt);
 
             // Prevent duplicate distribution rows for the same Track and DSP
             entity.HasIndex(td => new { td.TrackId, td.DspId }).IsUnique();

@@ -48,3 +48,9 @@ public class DistributeTrackRequest
 {
     public List<Guid> DspIds { get; set; } = new();
 }
+
+public class UpdateDistributionStatusRequest
+{
+    public string Status { get; set; } = string.Empty;
+    public string? RejectionReason { get; set; }
+}

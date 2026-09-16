@@ -20,6 +20,13 @@ export interface TrackDistribution {
   dspName: string;
   submittedAt: string;
   status: 'pending' | 'live' | 'rejected';
+  rejectionReason?: string;
+  reviewedAt?: string;
+}
+
+export interface UpdateDistributionStatusRequest {
+  status: 'live' | 'rejected';
+  rejectionReason?: string;
 }
 
 export interface Track {

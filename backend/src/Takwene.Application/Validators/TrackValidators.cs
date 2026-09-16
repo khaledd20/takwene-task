@@ -60,3 +60,21 @@ public class DistributeTrackRequestValidator : AbstractValidator<DistributeTrack
             .NotEmpty().WithMessage("DSP ID cannot be empty.");
     }
 }
+
+public class UpdateDistributionStatusRequestValidator : AbstractValidator<UpdateDistributionStatusRequest>
+{
+    public UpdateDistributionStatusRequestValidator()
+    {
+        RuleFor(x => x.Status)
+            .NotEmpty().WithMessage("Status is required.")
+            .Must(s => s != null && (s.Trim().Equals("live", StringComparison.OrdinalIgnoreCase) || s.Trim().Equals("rejected", StringComparison.OrdinalIgnoreCase)))
+            .WithMessage("Distribution status must be either 'live' or 'rejected'.");
+
+        When(x => x.Status != null && x.Status.Trim().Equals("rejected", StringComparison.OrdinalIgnoreCase), () =>
+        {
+            RuleFor(x => x.RejectionReason)
+                .NotEmpty().WithMessage("Rejection reason is required when rejecting a distribution.")
+                .MaximumLength(500).WithMessage("Rejection reason cannot exceed 500 characters.");
+        });
+    }
+}

@@ -148,6 +148,24 @@
 
 .btn-primary:hover { background: #4f46e5; }
 
+.btn-export {
+  background: #0f766e;
+  color: #ccfbf1;
+  border: 1px solid #14b8a6;
+  box-shadow: 0 2px 8px rgba(20, 184, 166, 0.2);
+}
+
+.btn-export:hover:not(:disabled) {
+  background: #115e59;
+  color: #ffffff;
+  border-color: #2dd4bf;
+}
+
+.btn-export:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 /* Main Content */
 .main-content {
   max-width: 1280px;

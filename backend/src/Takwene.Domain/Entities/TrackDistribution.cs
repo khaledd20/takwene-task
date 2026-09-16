@@ -9,6 +9,8 @@ public class TrackDistribution
     public Guid DspId { get; set; }
     public DateTime SubmittedAt { get; set; } = DateTime.UtcNow;
     public DistributionStatus Status { get; set; } = DistributionStatus.Pending;
+    public string? RejectionReason { get; set; }
+    public DateTime? ReviewedAt { get; set; }
 
     // Navigation properties
     public Track? Track { get; set; }
